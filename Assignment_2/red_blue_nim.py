@@ -1,14 +1,11 @@
 import sys
 
-# class State:
-#     def __init__(self, remainRMarbles, remainBMarbles):
-#         self.remainRMarbles = int(remainRMarbles)
-#         self.remainBMarbles = int(remainBMarbles)
 class State:
-    def __init__(self, remainRMarbles, remainBMarbles, version):
+    def __init__(self, remainRMarbles, remainBMarbles, version, depth):
         self.remainRMarbles = int(remainRMarbles)
         self.remainBMarbles = int(remainBMarbles)
         self.version = version
+        self.depth = int(depth)
         
 class Action:
     def __init__(self, marble_color, marbles_taken):
@@ -30,9 +27,7 @@ def print_intro(version):
 
 
 def make_copy_state(state):   
-    return State(state.remainRMarbles, state.remainBMarbles, state.version)
-# def make_copy_state(state):   
-#     return State(state.remainRMarbles, state.remainBMarbles)
+    return State(state.remainRMarbles, state.remainBMarbles, state.version, state.depth)
 
 def take_action(action,state,current_player): # After taking an action, the game state changes. Configure the game state 
     # Take Action Message
@@ -96,9 +91,9 @@ def end_of_game(state,current_player,version):
 
 def successor_state(action, state): # works similarily like take_action(), used in the alpha-beta decision algorithm for the computer's decision. Returns the successor state after taking an action
     if(action.marble_color == "R"):
-        successor = State(state.remainRMarbles - action.marbles_taken, state.remainBMarbles, state.version)    
+        successor = State(state.remainRMarbles - action.marbles_taken, state.remainBMarbles, state.version, state.depth)    
     elif(action.marble_color == "B"):
-        successor = State(state.remainRMarbles, state.remainBMarbles - action.marbles_taken, state.version)
+        successor = State(state.remainRMarbles, state.remainBMarbles - action.marbles_taken, state.version, state.depth)
 
 
     return successor
@@ -157,30 +152,36 @@ def successors(state):
         successorStateList.append(successor_state(action,state))
     return successorStateList
 
-# def utility(state):
-#     return (state.remainRMarbles * 2) + (state.remainBMarbles * 3)
 def utility(state, player):
     # Utility Function for the standard version
     if((player == "human") and (state.version == "standard")): # Computer won, the more favorable case is the one where the human has less "losing points". This is because the objective of the computer is to win with the most possible points, not win and spite the losing opponent with the most possible "losing poits"
-        if(state.remainRMarbles >= 1): 
+        if(state.remainRMarbles > state.remainBMarbles):
+            return 6
+        elif(state.remainRMarbles == state.remainBMarbles):
+            return 5
+        elif(state.remainRMarbles <   state.remainBMarbles):
             return 4
-        elif(state.remainBMarbles >= 1):
-            return 3
     elif((player == "computer") and (state.version == "standard")): # Computer lost, the more favorable case is the one where the computer has the least "losing points"
-        if(state.remainRMarbles >= 1):
+        if(state.remainRMarbles > state.remainBMarbles):
+            return 3
+        elif(state.remainRMarbles == state.remainBMarbles):
             return 2
-        elif(state.remainBMarbles >= 1):
+        elif(state.remainRMarbles <   state.remainBMarbles):
             return 1
     # Utility for the misere version
     elif((player == "computer") and (state.version == "misere")): #Computer won, the more favorable case is the one where the computer has the most "Winning points"
-        if(state.remainBMarbles >= 1):
+        if(state.remainRMarbles < state.remainBMarbles):
+            return 6
+        elif(state.remainRMarbles == state.remainBMarbles):
+            return 5
+        elif(state.remainRMarbles >= state.remainBMarbles):
             return 4
-        elif(state.remainRMarbles >= 1):
-            return 3
     elif((player == "human") and (state.version == "misere")): # Computer lost, the more favorable case is the one where the human is merciful and gives the computer the least possible "losing points"
-        if(state.remainRMarbles >= 1):
+        if(state.remainRMarbles >= state.remainBMarbles):
+            return 3
+        elif(state.remainRMarbles == state.remainBMarbles):
             return 2
-        elif(state.remainBMarbles >= 1):
+        elif(state.remainRMarbles < state.remainBMarbles):
             return 1
 
 def terminal_test(state):
@@ -204,7 +205,6 @@ def max_value(state, alpha, beta):
         if(v>=beta):
             return v
         alpha = max(alpha,v)
-        # alpha.value = max(alpha.value,v)
     
     return v
 
@@ -220,25 +220,71 @@ def min_value(state, alpha, beta):
         if(v<=alpha):
             return v
         beta = min(beta,v)
-        # beta.value = min(beta.value,v)
+    
+    return v  
+
+def depth_limited_max_value(state, alpha, beta,depth): 
+    if ((terminal_test(state) == True) or (depth==0)):
+        return utility(state,"computer")
+    v = -(sys.maxsize)
+
+    successorStateList = successors(state)
+
+    for s in successorStateList:
+        v = max(v, depth_limited_min_value(s,alpha,beta,depth-1))
+        if(v>=beta):
+            return v
+        alpha = max(alpha,v)
+    
+    return v
+
+def depth_limited_min_value(state, alpha, beta, depth):
+    if ((terminal_test(state) == True) or (depth==0)):
+        return utility(state,"human")
+    v = sys.maxsize
+
+    successorStateList = successors(state)
+
+    for s in successorStateList:
+        v = min(v, depth_limited_max_value(s,alpha,beta,depth-1))
+        if(v<=alpha):
+            return v
+        beta = min(beta,v)
     
     return v  
 
 def alpha_beta_decision(state):
-    v = max_value(make_copy_state(state),-(sys.maxsize),sys.maxsize)
-    print("Winning utiltity is", v)
+    if(state.depth == 0):
+        v = max_value(make_copy_state(state),-(sys.maxsize),sys.maxsize)
+        print("Winning utiltity is", v)
 
-    actionsList = possible_actions(make_copy_state(state)) # returns a list of possible actions for a given state
-    utilities = []
-    for action in actionsList:       
-        utility = min_value(successor_state(action, make_copy_state(state)),-(sys.maxsize),sys.maxsize)
-        utilities.append(utility)
-        print("Utility for Action: " + str(action.marble_color) + str(action.marbles_taken)+ " is " + str(utility))
-    print("")
+        actionsList = possible_actions(make_copy_state(state)) # returns a list of possible actions for a given state
+        utilities = []
+        for action in actionsList:       
+            utility = min_value(successor_state(action, make_copy_state(state)),-(sys.maxsize),sys.maxsize)
+            utilities.append(utility)
+            print("Utility for Action: " + str(action.marble_color) + str(action.marbles_taken)+ " is " + str(utility))
+        print("")
 
-    for a, u, in zip(actionsList,utilities):
-        if u == v:
-            return a
+        for a, u, in zip(actionsList,utilities):
+            if u == v:
+                return a
+    elif(state.depth > 0):
+        depth = state.depth
+        v = depth_limited_max_value(make_copy_state(state),-(sys.maxsize),sys.maxsize, depth + 0)
+        print("Winning utiltity is", v)
+
+        actionsList = possible_actions(make_copy_state(state)) # returns a list of possible actions for a given state
+        utilities = []
+        for action in actionsList:       
+            utility = depth_limited_min_value(successor_state(action, make_copy_state(state)),-(sys.maxsize),sys.maxsize, depth - 1)
+            utilities.append(utility)
+            print("Utility for Action: " + str(action.marble_color) + str(action.marbles_taken)+ " is " + str(utility))
+        print("")
+
+        for a, u, in zip(actionsList,utilities):
+            if u == v:
+                return a
 # =====================================================================================================
 
 
@@ -248,15 +294,15 @@ def config_init_state(arguments):
 
     first_player = "computer"
     version = "standard"
-    # depth = "-1"
+    depth = "0"
     if(len(arguments)>2): # User gave more than bare minimum arguments, must reconfigure default state values for <version> and <first-player> .
         if(len(arguments)==3): # User gave one optional argument, don't consider default attributes case.
             if((arguments[2]=="human")or(arguments[2]=="Human")):
                 first_player = "human"
             elif(arguments[2]=="misere")or(arguments[2]=="Misere"):
                 version = "misere"
-            # elif(is_integer(arguments[2])):
-            #     state.depth = arguments[2]
+            elif(is_integer(arguments[2])):
+                depth = arguments[2]
         elif(len(arguments)==4): # User gave atleast 2 optional arguments, don't configure default attributes case.
             if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
                 version = "misere"
@@ -265,25 +311,23 @@ def config_init_state(arguments):
                 version = "misere"
             elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
                 first_player = "human"
-            # elif((arguments[2]=="misere")or(arguments[2]=="Misere") and is_integer(arguments[3])):
-            #     state.version = "misere"
-            #     state.depth = arguments[3]
-            # elif((arguments[2]=="human")or(arguments[2]=="Human") and is_integer(arguments[3])):
-            #     state.player = human
-            #     state.depth = arguments[3]
-        # elif(len(arguments)==5): # User gave all arguments.
-        #     state.depth = int(arguments[4])
-        #     if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
-        #         state.version = "misere"
-        #         state.player = human
-        #     elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
-        #         state.version = "misere"
-        #     elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
-        #         state.player = human
-    return State(arguments[0], arguments[1], version), first_player
-
-
-
+            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and is_integer(arguments[3])):
+                version = "misere"
+                depth = arguments[3]
+            elif((arguments[2]=="human")or(arguments[2]=="Human") and is_integer(arguments[3])):
+                first_player = "human"
+                depth = arguments[3]
+        elif(len(arguments)==5): # User gave all arguments.
+            if(is_integer(arguments[4])):
+                depth = arguments[4]
+            if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
+                version = "misere"
+                first_player = human
+            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
+                version = "misere"
+            elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
+                first_player = "human"
+    return State(arguments[0], arguments[1], version, depth), first_player
 
 def main():
     if(len(sys.argv)<3):
@@ -291,23 +335,7 @@ def main():
         sys.exit()
 
     arguments = sys.argv[1:] # Arguments passed: <num red> <num blue> <version> <first-player> <depth>.)
-    # ==================================
     state, current_player = config_init_state(arguments)
-    # ==================================
-
-    # if((arguments[2] == "standard") or (arguments[2] == "Standard")):
-    #     version = "standard"
-    # elif((arguments[2] == "misere") or (arguments[2] == "Misere")):
-    #     version = "misere"
-
-    # if((arguments[3] == "computer") or (arguments[3] == "Computer")):
-    #     current_player = "computer"
-    # elif((arguments[3] == "human") or (arguments[3] == "Human")):
-    #     current_player = "human"
-    
-    # state = State(arguments[0], arguments[1], version) # Default state attributes set.
-    
-
     
     print_intro(state.version)
     while((state.remainBMarbles>0) and (state.remainRMarbles>0)):
