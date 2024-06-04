@@ -13,7 +13,8 @@ class Action:
         self.marbles_taken = int(marbles_taken)
         self.utility = 0
 
-def print_intro(version):
+# =============================================================================================Functions For the Game Loop=============================================================================================
+def print_intro(version): # Instructions on how to paly Nim
     print("______________________________________________________________________________________________________________________________")
     print("___________________________________________________________Nim Game___________________________________________________________")
     print("Welcome to Nim!\n\nInstructions:\nYou have a stack of red (R) marbles and another stack of blue (B) marbles.\nOn each turn you can take 1 or 2 marbles from either stack.")
@@ -26,7 +27,49 @@ def print_intro(version):
     print("______________________________________________________________________________________________________________________________\n\n")
 
 
-def make_copy_state(state):   
+def config_init_state(arguments):
+    # Command Line Argument Format: red_blue_nim.py <num-red> <num-blue> <version> <first-player> <depth>
+    
+    # Default Argument Values if not given or incorrect input
+    first_player = "computer"
+    version = "standard"
+    depth = "0"
+
+    if(len(arguments)>2): # User gave more than jsut the number of red and blue marbles.
+        if(len(arguments)==3): # User gave one optional argument.
+            if((arguments[2]=="human")or(arguments[2]=="Human")):
+                first_player = "human"
+            elif(arguments[2]=="misere")or(arguments[2]=="Misere"):
+                version = "misere"
+            elif(is_integer(arguments[2])):
+                depth = arguments[2]
+        elif(len(arguments)==4): # User gave atleast 2 optional arguments.
+            if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
+                version = "misere"
+                first_player = "human"
+            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
+                version = "misere"
+            elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
+                first_player = "human"
+            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and is_integer(arguments[3])):
+                version = "misere"
+                depth = arguments[3]
+            elif((arguments[2]=="human")or(arguments[2]=="Human") and is_integer(arguments[3])):
+                first_player = "human"
+                depth = arguments[3]
+        elif(len(arguments)==5): # User gave all arguments.
+            if(is_integer(arguments[4])):
+                depth = arguments[4]
+            if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
+                version = "misere"
+                first_player = human
+            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
+                version = "misere"
+            elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
+                first_player = "human"
+    return State(arguments[0], arguments[1], version, depth), first_player
+
+def make_copy_state(state):   # Used to avoid passing by object reference inside the alpha beta prunning functions 
     return State(state.remainRMarbles, state.remainBMarbles, state.version, state.depth)
 
 def take_action(action,state,current_player): # After taking an action, the game state changes. Configure the game state 
@@ -40,7 +83,7 @@ def take_action(action,state,current_player): # After taking an action, the game
     elif((action.marble_color == "B") and (current_player == "human")):
             print("\nYou take", action.marbles_taken, "blue marbles.\n")
 
-    # Things that will change: remaining marbles are the only thing that change from state to state
+    # Things that will change: remaining marbles change in every game state
     if((action.marble_color == "B")): # Marble picked is blue
         state.remainBMarbles = state.remainBMarbles - action.marbles_taken
     else: # Marble picked is red
@@ -55,7 +98,7 @@ def print_marble_stacks(state):
 def is_integer(s):
     return s.isdigit()
 
-def query_marble_color():
+def query_marble_color(): # asks user for marble color
     marble_color = input("Choose Marble (R/B): ").rstrip()
     if(marble_color == "r"):
         marble_color = "R"    
@@ -89,16 +132,18 @@ def end_of_game(state,current_player,version):
     elif((current_player == "human") and (version == "misere")):
         print("You Won!\nYou scored:", str(state.remainRMarbles*2 + state.remainBMarbles*3), "points")
 
-def successor_state(action, state): # works similarily like take_action(), used in the alpha-beta decision algorithm for the computer's decision. Returns the successor state after taking an action
+# =============================================================================================End of Game Loop Functions=============================================================================================
+
+
+# =============================================================================================Alpha-Beta Prunning Functions=============================================================================================
+def successor_state(action, state): # Returns a successor state after applying 'action' to 'state'
     if(action.marble_color == "R"):
         successor = State(state.remainRMarbles - action.marbles_taken, state.remainBMarbles, state.version, state.depth)    
     elif(action.marble_color == "B"):
         successor = State(state.remainRMarbles, state.remainBMarbles - action.marbles_taken, state.version, state.depth)
-
-
     return successor
 
-def possible_actions(state):
+def possible_actions(state): # Returns a list of possible actions at a given game state. Standard ordering:(R2,B2,R1,B1), Misere ordering: (B1,R1,B2,R2)
     actions = []
 
     if(state.version == "standard"):
@@ -145,8 +190,8 @@ def possible_actions(state):
             actions.append(Action("R","1"))
     return actions
 
-def successors(state):
-    actionsList = possible_actions(state) # returns a list of possible actions and a corresponding list of successor states
+def successors(state): # returns a list of possible successor states
+    actionsList = possible_actions(state) 
     successorStateList = []
     for action in actionsList: 
         successorStateList.append(successor_state(action,state))
@@ -159,14 +204,14 @@ def utility(state, player):
             return 6
         elif(state.remainRMarbles == state.remainBMarbles):
             return 5
-        elif(state.remainRMarbles <   state.remainBMarbles):
+        elif(state.remainRMarbles < state.remainBMarbles):
             return 4
     elif((player == "computer") and (state.version == "standard")): # Computer lost, the more favorable case is the one where the computer has the least "losing points"
         if(state.remainRMarbles > state.remainBMarbles):
             return 3
         elif(state.remainRMarbles == state.remainBMarbles):
             return 2
-        elif(state.remainRMarbles <   state.remainBMarbles):
+        elif(state.remainRMarbles < state.remainBMarbles):
             return 1
     # Utility for the misere version
     elif((player == "computer") and (state.version == "misere")): #Computer won, the more favorable case is the one where the computer has the most "Winning points"
@@ -174,10 +219,10 @@ def utility(state, player):
             return 6
         elif(state.remainRMarbles == state.remainBMarbles):
             return 5
-        elif(state.remainRMarbles >= state.remainBMarbles):
+        elif(state.remainRMarbles > state.remainBMarbles):
             return 4
     elif((player == "human") and (state.version == "misere")): # Computer lost, the more favorable case is the one where the human is merciful and gives the computer the least possible "losing points"
-        if(state.remainRMarbles >= state.remainBMarbles):
+        if(state.remainRMarbles > state.remainBMarbles):
             return 3
         elif(state.remainRMarbles == state.remainBMarbles):
             return 2
@@ -192,7 +237,7 @@ def terminal_test(state):
         return True
     else: 
         return False
-# =====================================================================================================
+
 def max_value(state, alpha, beta): 
     if (terminal_test(state) == True):
         return utility(state,"computer")
@@ -224,7 +269,7 @@ def min_value(state, alpha, beta):
     return v  
 
 def depth_limited_max_value(state, alpha, beta,depth): 
-    if ((terminal_test(state) == True) or (depth==0)):
+    if ((terminal_test(state) == True) or (depth==0)): #cutoff test
         return utility(state,"computer")
     v = -(sys.maxsize)
 
@@ -285,61 +330,19 @@ def alpha_beta_decision(state):
         for a, u, in zip(actionsList,utilities):
             if u == v:
                 return a
-# =====================================================================================================
-
-
-
-def config_init_state(arguments):
-    # Command Line Argument Format: red_blue_nim.py <num-red> <num-blue> <version> <first-player> <depth>
-
-    first_player = "computer"
-    version = "standard"
-    depth = "0"
-    if(len(arguments)>2): # User gave more than bare minimum arguments, must reconfigure default state values for <version> and <first-player> .
-        if(len(arguments)==3): # User gave one optional argument, don't consider default attributes case.
-            if((arguments[2]=="human")or(arguments[2]=="Human")):
-                first_player = "human"
-            elif(arguments[2]=="misere")or(arguments[2]=="Misere"):
-                version = "misere"
-            elif(is_integer(arguments[2])):
-                depth = arguments[2]
-        elif(len(arguments)==4): # User gave atleast 2 optional arguments, don't configure default attributes case.
-            if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
-                version = "misere"
-                first_player = "human"
-            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
-                version = "misere"
-            elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
-                first_player = "human"
-            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and is_integer(arguments[3])):
-                version = "misere"
-                depth = arguments[3]
-            elif((arguments[2]=="human")or(arguments[2]=="Human") and is_integer(arguments[3])):
-                first_player = "human"
-                depth = arguments[3]
-        elif(len(arguments)==5): # User gave all arguments.
-            if(is_integer(arguments[4])):
-                depth = arguments[4]
-            if((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="human")or(arguments[3]=="Human")):
-                version = "misere"
-                first_player = human
-            elif((arguments[2]=="misere")or(arguments[2]=="Misere") and (arguments[3]=="computer")or(arguments[3]=="Computer")):  
-                version = "misere"
-            elif((arguments[2]=="standard")or(arguments[2]=="Standard") and (arguments[3]=="human")or(arguments[3]=="Human")):  
-                first_player = "human"
-    return State(arguments[0], arguments[1], version, depth), first_player
+# =============================================================================================End of Alpha-Beta Prunning Functions=============================================================================================
 
 def main():
     if(len(sys.argv)<3):
         print("Not enough arguments\n")
         sys.exit()
 
-    arguments = sys.argv[1:] # Arguments passed: <num red> <num blue> <version> <first-player> <depth>.)
+    arguments = sys.argv[1:]
     state, current_player = config_init_state(arguments)
     
     print_intro(state.version)
-    while((state.remainBMarbles>0) and (state.remainRMarbles>0)):
-        if(current_player == "computer"):
+    while((state.remainBMarbles>0) and (state.remainRMarbles>0)): # Game Loop: Game ends when either marble stack is empty
+        if(current_player == "computer"): # Computer Turn
             print("\n===============================Computer===============================")
             print_marble_stacks(state)
             action = alpha_beta_decision(make_copy_state(state))
@@ -348,7 +351,7 @@ def main():
             print("========================================================================")
 
 
-        elif(current_player == "human"): #player turn
+        elif(current_player == "human"): # Human Turn
             print("\n================================Player================================")
             print_marble_stacks(state)
 

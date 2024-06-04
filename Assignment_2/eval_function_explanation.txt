@@ -1,0 +1,29 @@
+The way I have my eval function set up is that a 'depth' integer value is passed into both min and max value functions. As the algorithm makes it way down the recursion tree, it decrements the depth value at each level of the tree.
+The cutoff test looks if we are at a terminal node which is determined by terminal_test(state), or if the depth value reaches zero
+    Line in the code: if ((terminal_test(state) == True) or (depth==0)):
+
+The Eval/Utility Function
+Note: My "eval function" is called utility in my program.
+Remember: The amount of points that a player or opponent wins or losses by is determined by how many marbles are left. Red marbles are worth 2 points while blue marbles are worth 3 points.
+
+For either standard or misere version of the game, it considers 6 general possible scenarios that could happen at a terminal node or at a cutoff node, and ranks the more favorable options with a larger utility value (i.e. a utility of 1 is unfavorable, and 6 is the most favorable).
+
+For the Standard Version,
+In the event that the computer wins (human's turn is at the terminal node), the more favorable case is the one where the human has less "losing points". This is because the objective of the computer is to win with the most possible points, not win and spite the losing opponent with the most possible "losing points" 
+    Case 1: (Remaining Red Marbles) > (Remaining B Marbles) Has utility 6
+    Case 2: (Remaining Red Marbles) == (Remaining B Marbles) Has utility 5
+    Case 3: (Remaining Red Marbles) < (Remaining B Marbles) Has utility 4
+In the event that the computer loses (computer's turn is at the terminal node), the more favorable case is the one where the computer has the least "losing points"
+    Case 4: (Remaining Red Marbles) > (Remaining B Marbles) Has utility 3
+    Case 5: (Remaining Red Marbles) == (Remaining B Marbles) Has utility 2
+    Case 6: (Remaining Red Marbles) < (Remaining B Marbles) Has utility 1
+
+For the Misere Version,
+In the event the computer wins (computer's turn is at the terminal node), the more favorable case is the one where the computer has the most "Winning points"
+    Case 1: (Remaining Red Marbles) < (Remaining B Marbles) Has utility 6
+    Case 2: (Remaining Red Marbles) == (Remaining B Marbles) Has utility 5
+    Case 3: (Remaining Red Marbles) > (Remaining B Marbles) Has utility 4
+In the event that the computer loses (humans’ turn is at the terminal node), the more favorable case is the one where the human is merciful and gives the computer the least possible "losing points."
+    Case 4: (Remaining Red Marbles) > (Remaining B Marbles) Has utility 3
+    Case 5: (Remaining Red Marbles) == (Remaining B Marbles) Has utility 2
+    Case 6: (Remaining Red Marbles) < (Remaining B Marbles) Has utility 1
